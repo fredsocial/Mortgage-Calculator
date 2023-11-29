@@ -21,6 +21,7 @@ def mortgage_interest_calculator(principal, annual_rate, years):
 
     return monthly_payment, total_interest
 
+print ("")
 print ("-"*80)
 
 principal_amount = float(input("Loan Amount: "))
