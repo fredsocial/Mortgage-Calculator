@@ -31,6 +31,7 @@ loan_term_years = int(input("Loan term in Years: "))
 monthly_payment, total_interest = mortgage_interest_calculator(principal_amount, annual_interest_rate, loan_term_years)
 
 print ("-"*80)
+print ("")
 
 print(f"Monthly Payment: {monthly_payment:.2f}")
 print(f"Total Interest Paid: {total_interest:.2f}")
