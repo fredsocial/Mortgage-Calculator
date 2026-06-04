@@ -34,10 +34,24 @@ class MortgageCalculatorApp(tk.Tk):
         self.profit_after_tax = tk.StringVar(value="$0.00")
         self.sale_status = tk.StringVar(value="Enter sale details to estimate proceeds and tax.")
 
+        self.purchase_yearly_taxes = tk.StringVar(value="9000")
+        self.purchase_price = tk.StringVar(value="650000")
+        self.purchase_down_payment = tk.StringVar(value="150000")
+        self.purchase_rate = tk.StringVar(value="6.75")
+        self.purchase_years = tk.StringVar(value="30")
+        self.purchase_monthly_payment = tk.StringVar(value="$0.00")
+        self.purchase_monthly_taxes = tk.StringVar(value="$0.00")
+        self.purchase_total_monthly = tk.StringVar(value="$0.00")
+        self.purchase_annual_cost = tk.StringVar(value="$0.00")
+        self.purchase_tax_savings = tk.StringVar(value="$0.00")
+        self.tax_break_even_years = tk.StringVar(value="0.0 years")
+        self.purchase_status = tk.StringVar(value="Enter yearly taxes first, then purchase details.")
+
         self._configure_style()
         self._build_ui()
         self.calculate_mortgage()
         self.calculate_sale()
+        self.calculate_purchase()
 
     def _configure_style(self):
         style = ttk.Style(self)
@@ -63,7 +77,7 @@ class MortgageCalculatorApp(tk.Tk):
         ttk.Label(shell, text="Mortgage Calculator", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             shell,
-            text="Estimate mortgage payments, sale proceeds, and simple capital-gains tax.",
+            text="Estimate payments, sale proceeds, tax exposure, and purchase break-even timing.",
             style="Muted.TLabel",
         ).pack(anchor="w", pady=(6, 22))
 
@@ -72,11 +86,14 @@ class MortgageCalculatorApp(tk.Tk):
 
         mortgage_tab = ttk.Frame(tabs, padding=(0, 20, 0, 0))
         sale_tab = ttk.Frame(tabs, padding=(0, 20, 0, 0))
+        purchase_tab = ttk.Frame(tabs, padding=(0, 20, 0, 0))
         tabs.add(mortgage_tab, text="Mortgage")
         tabs.add(sale_tab, text="Sell Home")
+        tabs.add(purchase_tab, text="New Purchase")
 
         self._build_mortgage_tab(mortgage_tab)
         self._build_sale_tab(sale_tab)
+        self._build_purchase_tab(purchase_tab)
 
         self.bind("<Return>", lambda _event: self.calculate_active_tab(tabs))
 
@@ -138,6 +155,46 @@ class MortgageCalculatorApp(tk.Tk):
 
         ttk.Label(parent, textvariable=self.sale_status, style="Muted.TLabel").pack(anchor="w", pady=(16, 0))
 
+    def _build_purchase_tab(self, parent):
+        form = ttk.Frame(parent)
+        form.pack(fill="x")
+
+        self._add_field(form, "Yearly Taxes", self.purchase_yearly_taxes, "$")
+        self._add_field(form, "Purchase Price", self.purchase_price, "$")
+        self._add_field(form, "Down Payment", self.purchase_down_payment, "$")
+        self._add_field(form, "Annual Interest Rate", self.purchase_rate, "%")
+        self._add_field(form, "Loan Term", self.purchase_years, "years")
+
+        actions = ttk.Frame(parent)
+        actions.pack(fill="x", pady=(18, 20))
+        ttk.Button(actions, text="Calculate", style="Accent.TButton", command=self.calculate_purchase).pack(side="left")
+        ttk.Button(actions, text="Clear", command=self.clear_purchase).pack(side="left", padx=(10, 0))
+
+        results = ttk.Frame(parent, style="Panel.TFrame", padding=22)
+        results.pack(fill="both", expand=True)
+
+        ttk.Label(results, text="Total Monthly Cost", style="ResultLabel.TLabel").pack(anchor="w")
+        ttk.Label(results, textvariable=self.purchase_total_monthly, style="Result.TLabel").pack(
+            anchor="w",
+            pady=(4, 16),
+        )
+
+        grid = ttk.Frame(results, style="Panel.TFrame")
+        grid.pack(fill="x")
+        self._add_result(grid, "Mortgage Payment", self.purchase_monthly_payment, 0)
+        self._add_result(grid, "Monthly Taxes", self.purchase_monthly_taxes, 1)
+
+        cost_grid = ttk.Frame(results, style="Panel.TFrame")
+        cost_grid.pack(fill="x", pady=(18, 0))
+        self._add_result(cost_grid, "Annual Cost", self.purchase_annual_cost, 0)
+        self._add_result(cost_grid, "Sale Tax Savings", self.purchase_tax_savings, 1)
+
+        break_even_grid = ttk.Frame(results, style="Panel.TFrame")
+        break_even_grid.pack(fill="x", pady=(18, 0))
+        self._add_result(break_even_grid, "Yearly Tax Break-Even", self.tax_break_even_years, 0)
+
+        ttk.Label(parent, textvariable=self.purchase_status, style="Muted.TLabel").pack(anchor="w", pady=(16, 0))
+
     def _add_field(self, parent, label, variable, suffix):
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=7)
@@ -161,8 +218,10 @@ class MortgageCalculatorApp(tk.Tk):
     def calculate_active_tab(self, tabs):
         if tabs.index(tabs.select()) == 0:
             self.calculate_mortgage()
-        else:
+        elif tabs.index(tabs.select()) == 1:
             self.calculate_sale()
+        else:
+            self.calculate_purchase()
 
     def calculate_mortgage(self):
         try:
@@ -182,35 +241,57 @@ class MortgageCalculatorApp(tk.Tk):
 
     def calculate_sale(self):
         try:
-            initial_cost = self._number(self.initial_cost.get())
-            sale_price = self._number(self.sale_price.get())
-            selling_costs = self._number(self.selling_costs.get())
-            tax_rate = self._number(self.tax_rate.get())
+            sale = self._sale_summary()
 
-            if initial_cost < 0:
-                raise ValueError("Initial cost cannot be negative.")
-            if sale_price <= 0:
-                raise ValueError("Sale price must be greater than zero.")
-            if selling_costs < 0:
-                raise ValueError("Selling costs cannot be negative.")
-            if tax_rate < 0:
-                raise ValueError("Tax rate cannot be negative.")
-
-            net_proceeds = sale_price - selling_costs
-            total_gain = max(0, sale_price - initial_cost - selling_costs)
-            excluded_gain = min(total_gain, HOME_SALE_GAIN_EXCLUSION)
-            taxable_gain = max(0, total_gain - HOME_SALE_GAIN_EXCLUSION)
-            estimated_tax = taxable_gain * tax_rate / 100
-            profit_after_tax = net_proceeds - initial_cost - estimated_tax
-
-            self.net_proceeds.set(self._money(net_proceeds))
-            self.excluded_gain.set(self._money(excluded_gain))
-            self.taxable_gain.set(self._money(taxable_gain))
-            self.estimated_tax.set(self._money(estimated_tax))
-            self.profit_after_tax.set(self._money(profit_after_tax))
+            self.net_proceeds.set(self._money(sale["net_proceeds"]))
+            self.excluded_gain.set(self._money(sale["excluded_gain"]))
+            self.taxable_gain.set(self._money(sale["taxable_gain"]))
+            self.estimated_tax.set(self._money(sale["estimated_tax"]))
+            self.profit_after_tax.set(self._money(sale["profit_after_tax"]))
             self.sale_status.set("Sale estimate updated. First $500,000 of qualifying gain is excluded.")
         except ValueError as error:
             self.sale_status.set(str(error) or "Please enter valid numbers.")
+
+    def calculate_purchase(self):
+        try:
+            yearly_taxes = self._number(self.purchase_yearly_taxes.get())
+            purchase_price = self._number(self.purchase_price.get())
+            down_payment = self._number(self.purchase_down_payment.get())
+            annual_rate = self._number(self.purchase_rate.get())
+            years = int(self._number(self.purchase_years.get()))
+
+            if yearly_taxes <= 0:
+                raise ValueError("Yearly taxes must be greater than zero.")
+            if purchase_price <= 0:
+                raise ValueError("Purchase price must be greater than zero.")
+            if down_payment < 0:
+                raise ValueError("Down payment cannot be negative.")
+            if down_payment >= purchase_price:
+                raise ValueError("Down payment must be less than the purchase price.")
+            if annual_rate < 0:
+                raise ValueError("Annual interest rate cannot be negative.")
+            if years <= 0:
+                raise ValueError("Loan term must be greater than zero.")
+
+            loan_amount = purchase_price - down_payment
+            monthly_payment, _interest = mortgage_interest_calculator(loan_amount, annual_rate, years)
+            monthly_taxes = yearly_taxes / 12
+            total_monthly = monthly_payment + monthly_taxes
+            annual_cost = monthly_payment * 12 + yearly_taxes
+
+            sale = self._sale_summary()
+            tax_savings = sale["excluded_gain"] * sale["tax_rate"] / 100
+            break_even_years = tax_savings / yearly_taxes
+
+            self.purchase_monthly_payment.set(self._money(monthly_payment))
+            self.purchase_monthly_taxes.set(self._money(monthly_taxes))
+            self.purchase_total_monthly.set(self._money(total_monthly))
+            self.purchase_annual_cost.set(self._money(annual_cost))
+            self.purchase_tax_savings.set(self._money(tax_savings))
+            self.tax_break_even_years.set(f"{break_even_years:,.1f} years")
+            self.purchase_status.set("Purchase estimate updated using current Sell Home values.")
+        except ValueError as error:
+            self.purchase_status.set(str(error) or "Please enter valid numbers.")
 
     def clear_mortgage(self):
         self.loan_amount.set("")
@@ -232,6 +313,52 @@ class MortgageCalculatorApp(tk.Tk):
         self.estimated_tax.set("$0.00")
         self.profit_after_tax.set("$0.00")
         self.sale_status.set("Fields cleared.")
+
+    def clear_purchase(self):
+        self.purchase_yearly_taxes.set("")
+        self.purchase_price.set("")
+        self.purchase_down_payment.set("")
+        self.purchase_rate.set("")
+        self.purchase_years.set("")
+        self.purchase_monthly_payment.set("$0.00")
+        self.purchase_monthly_taxes.set("$0.00")
+        self.purchase_total_monthly.set("$0.00")
+        self.purchase_annual_cost.set("$0.00")
+        self.purchase_tax_savings.set("$0.00")
+        self.tax_break_even_years.set("0.0 years")
+        self.purchase_status.set("Fields cleared.")
+
+    def _sale_summary(self):
+        initial_cost = self._number(self.initial_cost.get())
+        sale_price = self._number(self.sale_price.get())
+        selling_costs = self._number(self.selling_costs.get())
+        tax_rate = self._number(self.tax_rate.get())
+
+        if initial_cost < 0:
+            raise ValueError("Initial cost cannot be negative.")
+        if sale_price <= 0:
+            raise ValueError("Sale price must be greater than zero.")
+        if selling_costs < 0:
+            raise ValueError("Selling costs cannot be negative.")
+        if tax_rate < 0:
+            raise ValueError("Tax rate cannot be negative.")
+
+        net_proceeds = sale_price - selling_costs
+        total_gain = max(0, sale_price - initial_cost - selling_costs)
+        excluded_gain = min(total_gain, HOME_SALE_GAIN_EXCLUSION)
+        taxable_gain = max(0, total_gain - HOME_SALE_GAIN_EXCLUSION)
+        estimated_tax = taxable_gain * tax_rate / 100
+        profit_after_tax = net_proceeds - initial_cost - estimated_tax
+
+        return {
+            "net_proceeds": net_proceeds,
+            "total_gain": total_gain,
+            "excluded_gain": excluded_gain,
+            "taxable_gain": taxable_gain,
+            "estimated_tax": estimated_tax,
+            "profit_after_tax": profit_after_tax,
+            "tax_rate": tax_rate,
+        }
 
     @staticmethod
     def _number(value):
