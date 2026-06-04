@@ -10,8 +10,21 @@ def mortgage_interest_calculator(principal, annual_rate, years):
     Returns:
     tuple: A tuple containing the monthly payment and the total interest paid
     """
+    if principal <= 0:
+        raise ValueError("Loan amount must be greater than zero.")
+
+    if annual_rate < 0:
+        raise ValueError("Annual interest rate cannot be negative.")
+
+    if years <= 0:
+        raise ValueError("Loan term must be greater than zero.")
+
     monthly_rate = annual_rate / 100 / 12
     total_payments = years * 12
+
+    if monthly_rate == 0:
+        monthly_payment = principal / total_payments
+        return monthly_payment, 0
 
     # Monthly payment calculation using the formula for an annuity
     monthly_payment = principal * monthly_rate / (1 - (1 + monthly_rate) ** -total_payments)
@@ -21,17 +34,27 @@ def mortgage_interest_calculator(principal, annual_rate, years):
 
     return monthly_payment, total_interest
 
-print ("")
-print ("-"*80)
 
-principal_amount = float(input("Loan Amount: "))
-annual_interest_rate = float(input("Annual interest rate: "))
-loan_term_years = int(input("Loan term in Years: "))
+def main():
+    print("")
+    print("-" * 80)
 
-monthly_payment, total_interest = mortgage_interest_calculator(principal_amount, annual_interest_rate, loan_term_years)
+    principal_amount = float(input("Loan Amount: "))
+    annual_interest_rate = float(input("Annual interest rate: "))
+    loan_term_years = int(input("Loan term in Years: "))
 
-print ("-"*80)
-print ("")
+    monthly_payment, total_interest = mortgage_interest_calculator(
+        principal_amount,
+        annual_interest_rate,
+        loan_term_years,
+    )
 
-print(f"Monthly Payment: {monthly_payment:.2f}")
-print(f"Total Interest Paid: {total_interest:.2f}")
+    print("-" * 80)
+    print("")
+
+    print(f"Monthly Payment: {monthly_payment:.2f}")
+    print(f"Total Interest Paid: {total_interest:.2f}")
+
+
+if __name__ == "__main__":
+    main()
